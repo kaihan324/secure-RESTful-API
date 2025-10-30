@@ -1,135 +1,82 @@
-# Secure Data Storage RESTful API
 
-This project is a practical assignment for an Information Security / Cryptography course. The goal is to design and implement a **RESTful API** that can:
-1. register and authenticate users securely,
-2. store users’ sensitive data **encrypted**,
-3. manage cryptographic keys in a secure way,
-4. and issue **JWT** tokens for accessing protected endpoints. :contentReference[oaicite:2]{index=2}
+ 🌐 API امن RESTful با رمزنگاری (FastAPI + AES)
 
-The focus is on **confidentiality**, **integrity**, and **secure key management**.
+این پروژه یک API امن RESTful را با استفاده از FastAPI پیاده‌سازی می‌کند که شامل ذخیره‌سازی رمزگذاری شده داده‌های حساس کاربران و مدیریت کلید داخلی (KMS) است.
 
----
+ ✨ ویژگی‌ها
 
-## Features
+- ثبت‌نام کاربران با استفاده از هش کردن پسورد (SHA-512 + salt + pepper)
+- ورود به سیستم با احراز هویت مبتنی بر JWT
+- رمزنگاری AES داده‌های حساس کاربران با کلیدهای رمزنگاری مخصوص هر کاربر
+- سیستم مدیریت کلید داخلی (KMS) برای تولید و ذخیره امن کلیدهای رمزنگاری
+- استفاده از SQLite به عنوان پایگاه داده سبک محلی
+- مستندات کامل API که به صورت خودکار با Swagger در آدرس `/docs` تولید می‌شود
 
-- **User registration**: users can create an account with username and password. Passwords are **never stored in plain text** and must be hashed (e.g. with **SHA-512**) before saving to the database. A unique **salt** and an application-level **pepper** must be used. :contentReference[oaicite:3]{index=3}
-- **User login**: after successful authentication, the API issues a **JWT** that the client can use for all subsequent requests. :contentReference[oaicite:4]{index=4}
-- **Secure storage of sensitive data**: users can send sensitive information (card number, address, personal info, …) and the API **encrypts** it (e.g. with **AES**) before saving it to the database (**encryption at rest**). :contentReference[oaicite:5]{index=5}
-- **Secure retrieval**: only authenticated users can retrieve their encrypted records; the API decrypts the data on demand and returns it in plaintext. :contentReference[oaicite:6]{index=6}
-- **Token expiration & security controls**: JWTs must have an expiration time; login attempts should be limited to mitigate **brute-force** attacks. :contentReference[oaicite:7]{index=7}
-- **Optional KMS (extra points)**: a separate key management module/service to generate, store, and rotate encryption keys; can be implemented using an external tool like **HashiCorp Vault** or **Keycloak**, or a custom secure storage. The main idea is that if the database is leaked, the data is still protected. :contentReference[oaicite:8]{index=8}
+ ⚙️ راه‌اندازی
 
----
+1. مخزن پروژه را کلون کرده و وارد دایرکتوری پروژه شوید:
+   ```bash
+   git clone https://your-repo-url.git
+   cd secure_api_project
+   ```
 
-## API Endpoints (Suggested)
+2. اسکریپت راه‌اندازی را اجرا کنید:
+   ```bash
+   ./setup.sh
+   ```
 
-> Note: exact routes can vary; below is a typical structure that satisfies the assignment.
+   این اسکریپت موارد زیر را انجام می‌دهد:
+   - ایجاد محیط مجازی پایتون (`venv`)
+   - نصب تمام وابستگی‌های موجود در فایل `requirements.txt`
 
-### 1. Auth
-- `POST /auth/register`  
-  - Body: `{ "username": "...", "password": "..." }`  
-  - Actions:
-    - hash password with SHA-512
-    - apply **salt** (per-user) and **pepper** (global)
-    - store user in DB  
-  - Returns: `201 Created`
+3. محیط مجازی را فعال کنید:
+   ```bash
+   source venv/bin/activate
+   ```
 
-- `POST /auth/login`  
-  - Body: `{ "username": "...", "password": "..." }`  
-  - Actions:
-    - verify password (hashing again with same salt+pepper)
-    - if OK → issue **JWT** with expiration
-  - Returns: `{ "access_token": "<JWT_TOKEN>" }`  
-  - Security: limit failed attempts. :contentReference[oaicite:9]{index=9}
+4. برنامه FastAPI را اجرا کنید:
+   ```bash
+   python -m uvicorn main:app --reload --host 0.0.0.0 --port 8001
+   ```
 
-### 2. Sensitive Data
-- `POST /data` (protected)
-  - Headers: `Authorization: Bearer <JWT>`
-  - Body: `{ "type": "card|address|note", "value": "..." }`
-  - Actions:
-    - fetch encryption key from KMS / key store
-    - encrypt value (e.g. AES-GCM / AES-CBC + HMAC)
-    - store encrypted value in DB with user_id
-  - Returns: stored object id
+5. مستندات API را در مرورگر خود باز کنید:
+   [http://localhost:8001/docs](http://localhost:8001/docs)
 
-- `GET /data` (protected)
-  - Returns list of user’s encrypted items (or decrypted, depending on design)
-  - If encrypted in DB → API decrypts **on the fly** before sending. :contentReference[oaicite:10]{index=10}
+ 🔐 متغیرهای محیطی (اختیاری اما توصیه‌شده)
 
-- `GET /data/{id}` (protected)
-  - Returns decrypted value belonging to that user.
+می‌توانید متغیرهای محیطی را برای مدیریت امن کلیدها تنظیم کنید:
 
----
+```bash
+export SECRET_KEY="your_jwt_secret_key"
+export PEPPER="your_global_pepper_value"
+export MASTER_KEY="32_byte_master_key_for_encryption"
+```
 
-## Security Design
+> ⚠️ مطمئن شوید که `MASTER_KEY` دقیقاً 32 بایت برای رمزنگاری AES-256 است.
 
-- **Password handling**:  
-  - Hash algorithm: `SHA-512` (or better: PBKDF2/Bcrypt/Argon2 if allowed)  
-  - Add **per-user salt** and store it alongside the user  
-  - Add **global pepper** in app config / env (not in DB)  
-  - Store only the **hash** in DB, never the raw password. :contentReference[oaicite:11]{index=11}
+ 
+ 📝 گزارش فنی
 
-- **JWT**:
-  - issued on login
-  - short lifetime (e.g. 15–60 minutes)
-  - must be verified on every protected endpoint
-  - expired tokens must be rejected. :contentReference[oaicite:12]{index=12}
+ 1. معماری کلی سامانه
 
-- **Encryption**:
-  - Symmetric encryption (e.g. AES) for sensitive fields
-  - Keys must be stored **outside** normal tables or protected by KMS
-  - Decryption happens only when the **authenticated** user calls GET. :contentReference[oaicite:13]{index=13}
+پروژه شامل یک API امن RESTful است که از FastAPI برای توسعه سریع و آسان استفاده می‌کند. این API از JWT برای احراز هویت و از AES برای رمزنگاری داده‌های حساس استفاده می‌کند. معماری به گونه‌ای طراحی شده است که در آن هر کاربر کلید رمزنگاری منحصر به فرد خود را دارد که توسط یک سیستم مدیریت کلید (KMS) امن تولید و ذخیره می‌شود. برای ذخیره‌سازی داده‌ها، از پایگاه داده SQLite به عنوان یک پایگاه داده محلی سبک استفاده می‌شود.
 
-- **Key Management (KMS)** (optional / bonus):  
-  - a service / module to:
-    - generate keys
-    - store keys in an encrypted storage
-    - fetch the right key per user / per record
-  - idea: even if DB is dumped, encrypted data remains safe because keys are not there. :contentReference[oaicite:14]{index=14}
+ 2. الگوریتم‌های رمزنگاری و هش استفاده‌شده
 
----
+- **هش پسوردها**: برای هش کردن پسوردها از SHA-512 به همراه salt و pepper استفاده می‌شود. این کار به منظور افزایش امنیت پسوردها انجام می‌شود.
+- **رمزنگاری داده‌ها**: برای رمزنگاری داده‌های حساس از AES با کلیدهای 256 بیتی استفاده می‌شود. هر کاربر یک کلید منحصر به فرد دارد که توسط سیستم مدیریت کلید تولید می‌شود.
 
-## Tech Stack (Flexible)
+ 3. ساختار پایگاه داده
 
-The assignment allows **any server-side language** that supports RESTful API development (Node.js, Python, Java, .NET, Go, …) and **any database** (MySQL, PostgreSQL, MongoDB, …). DB schema design is up to the student. API must be documented (Swagger or Postman collection). :contentReference[oaicite:15]{index=15}
+پایگاه داده پروژه از SQLite استفاده می‌کند که برای ذخیره‌سازی داده‌های کاربر و اطلاعات رمزنگاری شده به کار می‌رود. مدل‌های پایگاه داده به صورت SQLAlchemy طراحی شده‌اند و شامل جداول برای کاربران و داده‌های حساس است.
 
----
+ 4. روش مدیریت کلید
 
-## Documentation & Deliverables
+سیستم مدیریت کلید (KMS) مسئول تولید، ذخیره‌سازی و مدیریت امن کلیدهای رمزنگاری است. این کلیدها به صورت منحصر به فرد برای هر کاربر ایجاد می‌شوند و به صورت ایمن در سیستم نگهداری می‌شوند. در این پروژه، کلیدها به صورت محلی و در یک فایل امن ذخیره می‌شوند.
 
-The assignment requires:
-- **Complete source code** runnable on a local machine
-- **API documentation** (Swagger / Postman) with request/response examples
-- **Technical report (max 2 pages)** describing:
-  - system architecture
-  - chosen crypto & hash algorithms
-  - database structure
-  - key management approach
-  - and reasons for the choices
-- **Demo video (~5 minutes)** showing:
-  - project intro
-  - folder structure
-  - running the server & DB
-  - calling the APIs (register, login, store, retrieve)
-  - key management explanation. :contentReference[oaicite:16]{index=16}
+ 5. دلایل انتخاب ابزارها و روش‌ها
 
----
-
-## How to Run (example)
-
-1. Clone the repo  
-2. Configure DB connection + JWT secret + encryption key / KMS  
-3. Install dependencies  
-4. Run the API server  
-5. Import Swagger/Postman and test endpoints
-
-(Adjust this section to your actual language/framework.)
-
----
-
-## Future Improvements
-
-- per-user encryption keys
-- key rotation & revocation
-- audit log for sensitive operations
-- 2FA on login
+- **FastAPI**: این فریم‌ورک برای توسعه API‌های سریع و ایمن انتخاب شده است. FastAPI همچنین از ویژگی‌هایی مانند Swagger برای مستندسازی خودکار API پشتیبانی می‌کند.
+- **AES**: این الگوریتم به دلیل امنیت بالای آن و قابلیت‌های انعطاف‌پذیر برای رمزنگاری داده‌ها انتخاب شده است.
+- **SQLite**: به دلیل سادگی و سبک بودن، SQLite برای استفاده در محیط‌های توسعه و تست مناسب است. برای پروژه‌های با مقیاس بزرگ‌تر، می‌توان از پایگاه داده‌های دیگر مانند PostgreSQL یا MySQL استفاده کرد.
+- **JWT**: برای احراز هویت کاربران و ایجاد توکن‌های امن، از JWT استفاده می‌شود که امکان مدیریت جلسات را بدون ذخیره‌سازی داده در سرور فراهم می‌آورد.

@@ -1,0 +1,8 @@
+ fastapi
+ uvicorn
+ sqlalchemy
+ pydantic
+ cryptography
+ python-jose[cryptography]
+python-multipart
+
